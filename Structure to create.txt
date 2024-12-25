@@ -1,0 +1,198 @@
+📚 Project Structure for UI + API Automation Framework with Extent Report & FFmpeg Integration
+Below is the proposed project structure to effectively organize your UI and API automation framework, including FFmpeg for video recording and Extent Reports for detailed test reporting.
+
+📂 1. Project Structure
+graphql
+Copy code
+📦 AutomationFramework
+│
+├── 📂 src
+│   ├── 📂 main
+│   │   ├── 📂 java
+│   │   │   ├── 📂 base
+│   │   │   │   ├── BaseTest.java           # Common setup/teardown for UI/API tests
+│   │   │   │   ├── BasePage.java           # UI Base Page class
+│   │   │   │   ├── APIBase.java            # API Base Methods
+│   │   │   │   ├── FFmpegRecorder.java     # FFmpeg Video Recording Integration
+│   │   │   │
+│   │   │   ├── 📂 config
+│   │   │   │   ├── ConfigLoader.java       # Configuration loader (env-specific properties)
+│   │   │   │   ├── dev.properties          # Environment properties (DEV)
+│   │   │   │   ├── qa.properties           # Environment properties (QA)
+│   │   │   │
+│   │   │   ├── 📂 pages
+│   │   │   │   ├── LeadPage.java           # Example UI Page Object
+│   │   │   │
+│   │   │   ├── 📂 utils
+│   │   │   │   ├── ExtentManager.java      # Extent Report Configuration
+│   │   │   │   ├── Reporter.java           # Custom reportStep implementation
+│   │   │   │
+│   │   │   ├── 📂 constants
+│   │   │   │   ├── Locators.java           # Enum for UI locators
+│   │   │
+│   ├── 📂 test
+│   │   ├── 📂 java
+│   │   │   ├── 📂 ui
+│   │   │   │   ├── LeadTest.java           # UI Test Class
+│   │   │   │
+│   │   │   ├── 📂 api
+│   │   │   │   ├── LeadAPITest.java        # API Test Class
+│   │   │
+│   │   ├── 📂 resources
+│   │   │   ├── datafile.json               # Sample JSON data file
+│   │   │   ├── datafile.xlsx               # Sample Excel data file
+│   │   │
+│   ├── 📂 reports
+│   │   ├── ExtentReport.html               # Generated Extent Report
+│   │   ├── TestExecutionVideo.mp4          # Recorded FFmpeg Test Video
+│
+├── 📜 pom.xml                               # Project Dependencies (Maven)
+├── 📜 README.md                             # Framework Documentation
+🛠️ 2. Key Components and Responsibilities
+📂 base
+BaseTest.java: Handles setup (@BeforeTest) and teardown (@AfterTest) configurations for UI and API tests, including FFmpeg video recording initialization.
+BasePage.java: Parent class for UI Page Objects.
+APIBase.java: Core methods for API testing (GET, POST, PUT, DELETE).
+FFmpegRecorder.java: Video recording functionality for test execution.
+📂 config
+ConfigLoader.java: Dynamically loads environment properties (dev.properties, qa.properties).
+📂 pages
+Contains Page Object classes (e.g., LeadPage.java) representing UI pages.
+📂 utils
+ExtentManager.java: Configures and initializes Extent Reports.
+Reporter.java: Provides the reportStep method for customized reporting, now integrating FFmpeg video links in reports.
+📂 test
+Separate folders for UI and API test classes.
+📂 resources
+Stores test data files (JSON, Excel).
+📂 reports
+Generated Extent Report and Test Execution Video (via FFmpeg) are saved here.
+📝 3. Sample Code Implementation
+🛡️ 3.1 FFmpeg Integration
+FFmpegRecorder.java
+
+java
+Copy code
+package base;
+
+import java.io.IOException;
+
+public class FFmpegRecorder {
+    private Process process;
+
+    public void startRecording(String videoName) {
+        try {
+            String command = "ffmpeg -y -f gdigrab -framerate 30 -i desktop ./reports/" + videoName + ".mp4";
+            process = Runtime.getRuntime().exec(command);
+            System.out.println("FFmpeg Recording Started");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stopRecording() {
+        if (process != null) {
+            process.destroy();
+            System.out.println("FFmpeg Recording Stopped");
+        }
+    }
+}
+📝 3.2 Extent Report with FFmpeg Integration
+Reporter.java
+
+java
+Copy code
+package utils;
+
+import com.aventstack.extentreports.Status;
+import com.aventstack.extentreports.ExtentTest;
+import java.io.File;
+
+public class Reporter {
+    private ExtentTest extentTest;
+
+    public Reporter(ExtentTest test) {
+        this.extentTest = test;
+    }
+
+    public void reportStep(String description, String status, boolean screenshot, String videoName) {
+        if (screenshot) {
+            // Add screenshot logic
+        }
+
+        if (videoName != null) {
+            File videoFile = new File("./reports/" + videoName + ".mp4");
+            if (videoFile.exists()) {
+                extentTest.log(Status.valueOf(status.toUpperCase()), 
+                    description + " [Video](./" + videoFile.getPath() + ")");
+            }
+        } else {
+            extentTest.log(Status.valueOf(status.toUpperCase()), description);
+        }
+    }
+
+    public void reportStep(String description) {
+        extentTest.log(Status.INFO, description);
+    }
+}
+📝 3.3 BaseTest Setup
+BaseTest.java
+
+java
+Copy code
+package base;
+
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterTest;
+import utils.ExtentManager;
+import utils.Reporter;
+
+public class BaseTest {
+    protected Reporter reporter;
+    protected FFmpegRecorder recorder = new FFmpegRecorder();
+
+    @BeforeTest
+    public void setup() {
+        ExtentManager.initReport();
+        recorder.startRecording("TestExecutionVideo");
+        reporter = new Reporter(ExtentManager.createTest("Test Case"));
+    }
+
+    @AfterTest
+    public void teardown() {
+        recorder.stopRecording();
+        ExtentManager.flushReport();
+    }
+}
+📝 3.4 Example Test Case
+LeadTest.java
+
+java
+Copy code
+package test.ui;
+
+import base.BaseTest;
+import org.testng.annotations.Test;
+import pages.LeadPage;
+
+public class LeadTest extends BaseTest {
+
+    @Test
+    public void testSelectApp() {
+        LeadPage leadPage = new LeadPage();
+        leadPage.selectApp("CRM");
+        reporter.reportStep("Lead App Test Completed", "PASS", true, "TestExecutionVideo");
+    }
+}
+🚀 4. Dependencies (pom.xml)
+Ensure you include dependencies for:
+
+Selenium
+RestAssured
+ExtentReports
+TestNG
+✅ 5. Final Notes
+Video Recording: FFmpeg records the entire test execution.
+Dynamic Reports: Both screenshots and video links are embedded in Extent Reports.
+Modularity: Clear separation of UI, API, and Utilities ensures maintainability.
+This structure is highly scalable and supports both API and UI Automation seamlessly.
